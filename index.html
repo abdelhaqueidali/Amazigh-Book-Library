@@ -49,6 +49,18 @@
             margin-bottom: 5px;
         }
 
+        .book-filename {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .book-description {
+            font-size: 1em;
+            margin-bottom: 10px; /* Add some spacing */
+        }
+
+
         .book-buttons button {
             margin-right: 10px;
             padding: 8px 16px;
@@ -98,12 +110,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.377/build/pdf.min.js" integrity="sha512-LMuqA+cOQJbK+jGgHPwsyJ/BJh9h/gc+QFYkPq6fDgDm7sRa98UF/X78fKWfE4sT8b4LMFbLfhF7w+YI3rBfvw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
-(async function() { // Use an IIFE (Immediately Invoked Function Expression)
+(async function() {
     const bookListContainer = document.getElementById('book-list');
     const loadingIndicator = document.getElementById('loading');
 
-    // 1. Fetch the list.txt file
-    loadingIndicator.style.display = 'block'; // Show loading indicator
+    loadingIndicator.style.display = 'block';
 
     try {
         const response = await fetch('list.txt');
@@ -111,11 +122,17 @@
             throw new Error(`Failed to fetch list.txt: ${response.status}`);
         }
         const text = await response.text();
-        const bookNames = text.trim().split('\n').map(line => line.trim());
+        const lines = text.trim().split('\n');
 
-        // 2. Iterate through the book names
-        for (const bookName of bookNames) {
-            // Create elements for each book
+        for (const line of lines) {
+            const [filename, title, description] = line.trim().split('|');
+
+            if (!filename || !title || !description) {
+                console.warn("Skipping invalid line:", line);
+                continue;  // Skip lines with missing parts
+            }
+
+
             const bookContainer = document.createElement('div');
             bookContainer.classList.add('book-container');
 
@@ -127,34 +144,41 @@
 
             const bookTitle = document.createElement('div');
             bookTitle.classList.add('book-title');
-            bookTitle.textContent = bookName.replace(/\.pdf$/i, ""); // Remove .pdf for display
+            bookTitle.textContent = title; // Use the title from the file
+
+            const bookFilename = document.createElement('div');
+            bookFilename.classList.add('book-filename');
+            bookFilename.textContent = filename;
+
+            const bookDescription = document.createElement('div');
+            bookDescription.classList.add('book-description');
+            bookDescription.textContent = description;
 
             const bookButtons = document.createElement('div');
             bookButtons.classList.add('book-buttons');
 
-            // --- Download Button ---
             const downloadButton = document.createElement('button');
-            downloadButton.innerHTML = `<a href="Books/${bookName}" download="${bookName}">Download</a>`;
+            downloadButton.innerHTML = `<a href="Books/${filename}" download="${filename}">Download</a>`;
 
-
-            // --- Read Button ---
             const readButton = document.createElement('button');
             readButton.textContent = 'Read';
             readButton.addEventListener('click', () => {
-                window.open(`Books/${bookName}`, '_blank'); // Open in new tab/window
+                window.open(`Books/${filename}`, '_blank');
             });
 
-            // --- PDF.js Cover Rendering ---
             const canvas = document.createElement('canvas');
             bookCover.appendChild(canvas);
-            renderCover(`Books/${bookName}`, canvas);
+            renderCover(`Books/${filename}`, canvas);
 
-            // --- Assemble the elements ---
+
             bookButtons.appendChild(downloadButton);
             bookButtons.appendChild(readButton);
 
             bookInfo.appendChild(bookTitle);
+            bookInfo.appendChild(bookFilename); // Display filename
+            bookInfo.appendChild(bookDescription);
             bookInfo.appendChild(bookButtons);
+
 
             bookContainer.appendChild(bookCover);
             bookContainer.appendChild(bookInfo);
@@ -165,21 +189,19 @@
         console.error('Error:', error);
         bookListContainer.innerHTML = `<p>Error loading book list: ${error.message}</p>`;
     } finally {
-        loadingIndicator.style.display = 'none'; // Hide loading indicator
+        loadingIndicator.style.display = 'none';
     }
 
-    // --- Function to render the cover using PDF.js ---
+
     async function renderCover(pdfPath, canvas) {
         try {
-            // Use Range Request to get the first 64KB (adjust as needed)
             const rangeResponse = await fetch(pdfPath, {
                 headers: { 'Range': 'bytes=0-65535' }
             });
 
             if (!rangeResponse.ok) {
-                if (rangeResponse.status === 416) { // Range Not Satisfiable
+                if (rangeResponse.status === 416) {
                   console.warn(`Range not satisfiable for ${pdfPath}.  Trying full fetch (slower).`);
-                  // fallback for small files
                   renderCoverFull(pdfPath, canvas);
                   return;
 
@@ -195,7 +217,6 @@
             const page = await pdf.getPage(1);
             const viewport = page.getViewport({ scale: 1 });
 
-            // set canvas size to the pdf dimension
             canvas.width = viewport.width;
             canvas.height = viewport.height;
 
@@ -209,7 +230,7 @@
 
         } catch (error) {
             console.error(`Error rendering cover for ${pdfPath}:`, error);
-            canvas.style.backgroundColor = '#eee'; // Gray background for failed renders
+            canvas.style.backgroundColor = '#eee';
             canvas.textContent = 'Cover not available';
         }
     }
@@ -221,8 +242,6 @@
 
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 1 });
-
-        // set canvas size to the pdf dimension
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
@@ -235,12 +254,11 @@
       }
       catch(err){
         console.error(`Error rendering cover for ${pdfPath}:`, err);
-        canvas.style.backgroundColor = '#eee'; // Gray background for failed renders
+        canvas.style.backgroundColor = '#eee';
         canvas.textContent = 'Cover not available';
       }
     }
 })();
-
     </script>
 </body>
 </html>
